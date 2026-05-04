@@ -7,117 +7,54 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v2
       with:
-        fetch-depth: 1
+        path: master
 
-    - name: Debug - Print environment
-      run: |
-        echo "=== System Info ==="
-        echo "OS: $(uname -a)"
-        python3 --version
-        pwd
-        ls -la
-
-    - name: Set up Python 3.10
-      uses: actions/setup-python@v5
+    - name: Set up Python
+      uses: actions/setup-python@v2
       with:
-        python-version: '3.10'
+        python-version: '3.8'
+        architecture: x64
 
-    - name: Debug - Python info
+    - name: Install dependencies
       run: |
-        echo "Python: $(which python3)"
-        python3 --version
-        pip3 --version
-
-    - name: Install system packages
-      run: |
-        echo "=== Installing system packages ==="
-        sudo apt-get update
-        sudo apt-get install -y \
-          python3-pip \
-          python3-dev \
-          git \
-          openjdk-11-jdk \
-          zip \
-          unzip \
-          autoconf \
-          libtool \
-          pkg-config \
-          zlib1g-dev \
-          libncurses5-dev \
-          cmake \
-          libffi-dev \
-          libssl-dev \
-          ffmpeg \
-          libsdl2-dev \
-          libsdl2-image-dev \
-          libsdl2-mixer-dev \
-          libsdl2-ttf-dev
-        echo "=== System packages installed ==="
-
-    - name: Install Python packages
-      run: |
-        echo "=== Installing Python packages ==="
-        pip3 install --upgrade pip
-        pip3 install kivy==2.2.0
-        echo "=== Kivy installed ==="
-        pip3 install buildozer
-        echo "=== Buildozer installed ==="
-        pip3 list | grep -i kivy
-        pip3 list | grep -i buildozer
+        python -m pip install --upgrade pip
+        pip install --upgrade Cython
+        pip install kivy==2.1.0
 
     - name: Create buildozer.spec
       run: |
-        echo "=== Creating buildozer.spec ==="
-        printf '[app]\ntitle = Calculator\npackage.name = calculator\npackage.domain = org.example\nsource.dir = .\nversion = 1.0\nrequirements = python3,kivy==2.2.0\norientation = portrait\nfullscreen = 0\n\n[buildozer]\nlog_level = 2\nwarn_on_root = 1\n' > buildozer.spec
-        cat buildozer.spec
-        echo "=== buildozer.spec created ==="
+        cat > buildozer.spec << 'EOF'
+[app]
+title = Calculator
+package.name = calculator
+package.domain = org.example
+source.dir = .
+version = 1.0
+requirements = python3,kivy==2.1.0
+orientation = portrait
+fullscreen = 0
 
-    - name: Initialize Android SDK
-      run: |
-        echo "=== Initializing Android SDK ==="
-        export ANDROID_HOME="${HOME}/android-sdk"
-        export PATH="${PATH}:${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/platform-tools"
-        echo "ANDROID_HOME: $ANDROID_HOME"
-        
-        if [ ! -d "$ANDROID_HOME" ]; then
-          mkdir -p "$ANDROID_HOME/cmdline-tools"
-          cd "$ANDROID_HOME/cmdline-tools"
-          wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O cmdline-tools.zip
-          unzip -q cmdline-tools.zip
-          mv cmdline-tools latest
-          rm cmdline-tools.zip
-        fi
-        
-        yes | "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null 2>&1 || true
-        "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" --install "platform-tools" "platforms;android-33" "build-tools;33.0.2"
-        echo "=== Android SDK initialized ==="
+[buildozer]
+log_level = 2
+warn_on_root = 1
+EOF
 
-    - name: Build APK
-      run: |
-        echo "=== Starting APK build ==="
-        export ANDROID_HOME="${HOME}/android-sdk"
-        export PATH="${PATH}:${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/platform-tools"
-        echo "ANDROID_HOME: $ANDROID_HOME"
-        
-        buildozer android debug || {
-          echo "=== Build failed, checking logs ==="
-          ls -la .buildozer/ 2>/dev/null || true
-          exit 1
-        }
-        
-        echo "=== Build completed ==="
-        ls -la bin/ 2>/dev/null || echo "bin directory not found"
-
-    - name: Upload APK
-      if: success()
-      uses: actions/upload-artifact@v4
+    - name: Build with Buildozer
+      uses: ArtemSBulgakov/buildozer-action@v1
+      id: buildozer
       with:
-        name: calculator-debug-apk
-        path: bin/*.apk
-        retention-days: 7
+        repository_root: master
+        workdir: .
+        buildozer_version: stable
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        name: calculator-apk
+        path: ${{ steps.buildozer.outputs.filename }}
