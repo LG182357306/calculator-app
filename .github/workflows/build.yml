@@ -11,13 +11,18 @@ jobs:
     
     steps:
     - name: Checkout
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
     
     - name: Set up JDK
-      uses: actions/setup-java@v3
+      uses: actions/setup-java@v4
       with:
         java-version: '11'
         distribution: 'temurin'
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
     
     - name: Install system dependencies
       run: |
@@ -31,7 +36,6 @@ jobs:
           pkg-config \
           zlib1g-dev \
           libncurses5-dev \
-          python3-pip \
           python3-dev \
           ffmpeg \
           libsdl2-dev \
@@ -39,17 +43,25 @@ jobs:
           libsdl2-mixer-dev \
           libsdl2-ttf-dev \
           libffi-dev \
-          libssl-dev
+          libssl-dev \
+          cmake \
+          libgmp-dev \
+          libmpc-dev \
+          libmpfr-dev
     
     - name: Install Python dependencies
       run: |
-        pip install --upgrade pip
-        pip install buildozer kivy cython pillow
+        pip install --upgrade pip setuptools wheel
+        pip install kivy cython pillow
+    
+    - name: Install python-for-android
+      run: |
+        pip install python-for-android
     
     - name: Create main.py
       run: |
         if [ ! -f main.py ]; then
-          cat > main.py << 'EOF'
+          cat > main.py << 'ENDOFFILE'
 from kivy.app import App
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.gridlayout import GridLayout
@@ -209,12 +221,12 @@ class CalculatorApp(App):
 
 if __name__ == '__main__':
     CalculatorApp().run()
-EOF
+ENDOFFILE
         fi
     
     - name: Create buildozer.spec
       run: |
-        cat > buildozer.spec << 'EOF'
+        cat > buildozer.spec << 'ENDOFSPEC'
 [app]
 title = Calculator
 package.name = calculator
@@ -230,15 +242,36 @@ log_level = 2
 warn_on_root = 1
 build_dir = ./build
 bin_dir = ./bin
-EOF
+ENDOFSPEC
     
     - name: Build APK
       run: |
-        pip install python-for-android
+        export ANDROIDSDK=$HOME/android-sdk
+        export PATH=$PATH:$ANDROIDSDK/cmdline-tools/latest/bin:$ANDROIDSDK/platform-tools
+        
+        # Initialize Android SDK if not exists
+        if [ ! -d "$ANDROIDSDK" ]; then
+          mkdir -p $ANDROIDSDK/cmdline-tools
+          cd $ANDROIDSDK/cmdline-tools
+          wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O cmdline-tools.zip
+          unzip -q cmdline-tools.zip
+          mv cmdline-tools latest
+          rm cmdline-tools.zip
+        fi
+        
+        # Accept licenses
+        yes | $ANDROIDSDK/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null 2>&1 || true
+        
+        # Install required SDK components
+        $ANDROIDSDK/cmdline-tools/latest/bin/sdkmanager --install "platform-tools" "platforms;android-33" "build-tools;33.0.2" > /dev/null 2>&1 || true
+        
+        # Build with python-for-android
+        python -m pip install buildozer
         buildozer android debug
     
     - name: Upload APK
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
+      if: success()
       with:
         name: calculator-apk
         path: bin/*.apk
