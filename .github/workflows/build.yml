@@ -17,11 +17,9 @@ jobs:
 
     - name: Debug - Print environment
       run: |
-        echo "=== 系统信息 ==="
+        echo "=== System Info ==="
         echo "OS: $(uname -a)"
-        echo "Python版本:"
         python3 --version
-        echo "当前目录:"
         pwd
         ls -la
 
@@ -30,16 +28,15 @@ jobs:
       with:
         python-version: '3.10'
 
-    - name: Debug - Python信息
+    - name: Debug - Python info
       run: |
-        echo "Python路径:"
-        which python3
+        echo "Python: $(which python3)"
         python3 --version
         pip3 --version
 
     - name: Install system packages
       run: |
-        echo "=== 安装系统包 ==="
+        echo "=== Installing system packages ==="
         sudo apt-get update
         sudo apt-get install -y \
           python3-pip \
@@ -61,43 +58,29 @@ jobs:
           libsdl2-image-dev \
           libsdl2-mixer-dev \
           libsdl2-ttf-dev
-        echo "=== 系统包安装完成 ==="
+        echo "=== System packages installed ==="
 
     - name: Install Python packages
       run: |
-        echo "=== 安装Python包 ==="
+        echo "=== Installing Python packages ==="
         pip3 install --upgrade pip
         pip3 install kivy==2.2.0
-        echo "=== Kivy安装完成 ==="
+        echo "=== Kivy installed ==="
         pip3 install buildozer
-        echo "=== Buildozer安装完成 ==="
+        echo "=== Buildozer installed ==="
         pip3 list | grep -i kivy
         pip3 list | grep -i buildozer
 
     - name: Create buildozer.spec
       run: |
-        echo "=== 创建buildozer.spec ==="
-        cat > buildozer.spec << 'EOF'
-[app]
-title = Calculator
-package.name = calculator
-package.domain = org.example
-source.dir = .
-version = 1.0
-requirements = python3,kivy==2.2.0
-orientation = portrait
-fullscreen = 0
-
-[buildozer]
-log_level = 2
-warn_on_root = 1
-EOF
+        echo "=== Creating buildozer.spec ==="
+        printf '[app]\ntitle = Calculator\npackage.name = calculator\npackage.domain = org.example\nsource.dir = .\nversion = 1.0\nrequirements = python3,kivy==2.2.0\norientation = portrait\nfullscreen = 0\n\n[buildozer]\nlog_level = 2\nwarn_on_root = 1\n' > buildozer.spec
         cat buildozer.spec
-        echo "=== buildozer.spec创建完成 ==="
+        echo "=== buildozer.spec created ==="
 
     - name: Initialize Android SDK
       run: |
-        echo "=== 初始化Android SDK ==="
+        echo "=== Initializing Android SDK ==="
         export ANDROID_HOME="${HOME}/android-sdk"
         export PATH="${PATH}:${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/platform-tools"
         echo "ANDROID_HOME: $ANDROID_HOME"
@@ -113,23 +96,23 @@ EOF
         
         yes | "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null 2>&1 || true
         "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" --install "platform-tools" "platforms;android-33" "build-tools;33.0.2"
-        echo "=== Android SDK初始化完成 ==="
+        echo "=== Android SDK initialized ==="
 
     - name: Build APK
       run: |
-        echo "=== 开始构建APK ==="
+        echo "=== Starting APK build ==="
         export ANDROID_HOME="${HOME}/android-sdk"
         export PATH="${PATH}:${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/platform-tools"
         echo "ANDROID_HOME: $ANDROID_HOME"
         
         buildozer android debug || {
-          echo "=== 构建失败，检查日志 ==="
-          cat .buildozer/*.log 2>/dev/null || true
+          echo "=== Build failed, checking logs ==="
+          ls -la .buildozer/ 2>/dev/null || true
           exit 1
         }
         
-        echo "=== 构建完成 ==="
-        ls -la bin/ 2>/dev/null || echo "bin目录不存在"
+        echo "=== Build completed ==="
+        ls -la bin/ 2>/dev/null || echo "bin directory not found"
 
     - name: Upload APK
       if: success()
