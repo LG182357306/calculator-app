@@ -8,27 +8,28 @@ on:
 jobs:
   build:
     runs-on: ubuntu-20.04
+    permissions:
+      contents: write
+      actions: write
     
     steps:
     - name: Checkout code
       uses: actions/checkout@v2
-      with:
-        path: master
 
-    - name: Set up Python
+    - name: Set up Python 3.8
       uses: actions/setup-python@v2
       with:
         python-version: '3.8'
-        architecture: x64
 
-    - name: Install dependencies
+    - name: Install dependencies and build
       run: |
+        echo "=== Installing dependencies ==="
         python -m pip install --upgrade pip
-        pip install --upgrade Cython
+        pip install --upgrade cython
         pip install kivy==2.1.0
-
-    - name: Create buildozer.spec
-      run: |
+        pip install buildozer
+        
+        echo "=== Creating buildozer.spec ==="
         cat > buildozer.spec << 'EOF'
 [app]
 title = Calculator
@@ -38,23 +39,25 @@ source.dir = .
 version = 1.0
 requirements = python3,kivy==2.1.0
 orientation = portrait
-fullscreen = 0
 
 [buildozer]
 log_level = 2
 warn_on_root = 1
 EOF
+        
+        echo "=== Starting build ==="
+        buildozer android debug 2>&1 || {
+          echo "=== Build failed, checking logs ==="
+          cat .buildozer/android/platform/build-arm64-v8a_armeabi-v7a/build.log 2>/dev/null || true
+          exit 1
+        }
+        
+        echo "=== Build completed ==="
+        ls -la bin/*.apk 2>/dev/null || echo "No APK found"
 
-    - name: Build with Buildozer
-      uses: ArtemSBulgakov/buildozer-action@v1
-      id: buildozer
-      with:
-        repository_root: master
-        workdir: .
-        buildozer_version: stable
-
-    - name: Upload artifacts
+    - name: Upload APK
+      if: success()
       uses: actions/upload-artifact@v2
       with:
         name: calculator-apk
-        path: ${{ steps.buildozer.outputs.filename }}
+        path: bin/*.apk
