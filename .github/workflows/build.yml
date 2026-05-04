@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build Calculator APK
 
 on:
   push:
@@ -10,49 +10,30 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-    - name: Checkout code
+    - name: Checkout
       uses: actions/checkout@v4
 
-    - name: Set up Python 3.10
+    - name: Set up Python
       uses: actions/setup-python@v5
       with:
         python-version: '3.10'
 
-    - name: Install dependencies
+    - name: Install system packages
       run: |
         sudo apt-get update
         sudo apt-get install -y \
           python3-pip \
-          python3-dev \
           git \
-          zip \
-          unzip \
           openjdk-11-jdk \
-          autoconf \
-          libtool \
-          pkg-config \
-          zlib1g-dev \
-          libncurses5-dev \
-          libncursesw5-dev \
-          cmake \
-          libffi-dev \
-          libssl-dev \
-          ffmpeg \
-          libsdl2-dev \
-          libsdl2-image-dev \
-          libsdl2-mixer-dev \
-          libsdl2-ttf-dev
-          
+          zip \
+          unzip
+
     - name: Install Python packages
       run: |
-        pip install --upgrade pip wheel setuptools
-        pip install kivy cython pillow
-        
-    - name: Install python-for-android
-      run: |
-        pip install python-for-android buildozer
-        
-    - name: Create buildozer.spec
+        pip install kivy==2.2.0
+        pip install buildozer
+
+    - name: Create spec file
       run: |
         cat > buildozer.spec << 'EOF'
 [app]
@@ -61,26 +42,22 @@ package.name = calculator
 package.domain = org.example
 source.dir = .
 version = 1.0
-requirements = python3,kivy
+requirements = python3,kivy==2.2.0
 orientation = portrait
-fullscreen = 0
 
 [buildozer]
 log_level = 2
 warn_on_root = 1
-build_dir = ./build
-bin_dir = ./bin
 EOF
 
-    - name: Build debug APK
+    - name: Build APK
       run: |
         buildozer android debug
-      timeout-minutes: 45
-        
-    - name: Upload APK artifact
+      timeout-minutes: 40
+
+    - name: Upload APK
+      if: always()
       uses: actions/upload-artifact@v4
-      if: success()
       with:
-        name: calculator-debug-apk
+        name: calculator-apk
         path: bin/*.apk
-        retention-days: 5
